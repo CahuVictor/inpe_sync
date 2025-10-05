@@ -21,7 +21,9 @@ def start_scheduler(app):
     scheduler = AsyncIOScheduler()
     # cron estilo "* */30 * * * *" (minuto, hora, dia...)
     trig = CronTrigger.from_crontab(settings.schedule_cron)
-    scheduler.add_job(lambda: run_incremental(), trig, name="incremental-sync")
+    # 👇 passe a função, não uma lambda que retorna coroutine
+    # scheduler.add_job(lambda: run_incremental(), trig, name="incremental-sync")
+    scheduler.add_job(run_incremental, trig, name="incremental-sync")
     scheduler.start()
     log.info("scheduler.started", cron=settings.schedule_cron)
 

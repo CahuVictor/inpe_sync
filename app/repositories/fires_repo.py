@@ -1,5 +1,7 @@
-from typing import Any, Dict, Iterable
+# app/repositories/fires_repo.py
+from typing import Any, Dict, Iterable, List
 from motor.motor_asyncio import AsyncIOMotorCollection
+from pymongo import UpdateOne
 
 from ..logging_config import get_logger
 
@@ -52,27 +54,53 @@ def feature_to_doc(f: Dict[str, Any]) -> Dict[str, Any]:
 
 async def upsert_many(coll: AsyncIOMotorCollection, docs: Iterable[Dict[str, Any]]):
     """
+    Faz upsert idempotente em lote usando operações do PyMongo.
+    Cada doc precisa ter '_id' definido (já mapeado a partir de foco_id/id_foco_bdq).
+    
     Executa bulk upsert (idempotente) para uma lista de documentos.
+    
+    Upsert em lote idempotente (_id).
+    Loga contadores do resultado para sabermos se escreveu no Atlas.
     """
     docs = list(docs)
     if not docs:
         return
-    ops = []
+    
+    ops: List[UpdateOne] = []
     for d in docs:
-        key = {"_id": d["_id"]}
-        ops.append(
-            {
-                "updateOne": {
-                    "filter": key,
-                    "update": {"$set": d},
-                    "upsert": True,
-                }
-            }
-        )
+        # key = {"_id": d["_id"]}
+        # ops.append(
+        #     {
+        #         "updateOne": {
+        #             "filter": key,
+        #             "update": {"$set": d},
+        #             "upsert": True,
+        #         }
+        #     }
+        # )
+        _id = d.get("_id")
+        if _id is None:
+            # segurança extra (não deveria ocorrer no seu fluxo)
+            continue
+        ops.append(UpdateOne({"_id": _id}, {"$set": d}, upsert=True))
+
     # if ops:
     #     await coll.bulk_write(ops, ordered=False)
+    if not ops:
+        return
+    
     res = await coll.bulk_write(ops, ordered=False)
-    log.info("mongo.bulk_upsert", matched=res.matched_count, upserted=len(res.upserted_ids or []), modified=res.modified_count)
+    
+    # upserted_ids é um dict {indice_na_lista: _id}
+    log.info(
+        "mongo.bulk_upsert",
+        acknowledged=res.acknowledged,
+        requested=len(ops),
+        matched=res.matched_count,
+        modified=res.modified_count,
+        upserted=len(res.upserted_ids or {}),
+        coll=str(coll.full_name),
+    )
 
 async def max_date(coll: AsyncIOMotorCollection, date_field: str) -> str | None:
     """

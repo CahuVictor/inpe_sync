@@ -31,45 +31,45 @@ def _clean_sortby(val: str | None) -> str | None:
     v = val.split("#", 1)[0].strip()
     return v or None
 
-# async def fetch_wfs_page(
-#     start: str,
-#     end: str,
-#     start_index: int = 0,
-#     count: int = settings.wfs_page_size,
-# ) -> dict:
-#     params = {
-#         "service": "WFS",
-#         "version": "2.0.0",
-#         "request": "GetFeature",
-#         "typeName": settings.wfs_typename,
-#         "srsName": settings.wfs_srid,
-#         "outputFormat": "application/json",
-#         # "CQL_FILTER": f"{settings.wfs_date_field} BETWEEN '{start}' AND '{end}'",
-#         "count": str(count),
-#         "startIndex": str(start_index),
-#         "sortBy": settings.wfs_sortby,
-#     }
-#     url = _wfs_url(params)
-#     async with httpx.AsyncClient(timeout=60) as client:
-#         r = await client.get(url)
-#         r.raise_for_status()
-#         return r.json()
+async def fetch_wfs_page(
+    start: str,
+    end: str,
+    start_index: int = 0,
+    count: int = settings.wfs_page_size,
+) -> dict:
+    params = {
+        "service": "WFS",
+        "version": "2.0.0",
+        "request": "GetFeature",
+        "typeName": settings.wfs_typename,
+        "srsName": settings.wfs_srid,
+        "outputFormat": "application/json",
+        # "CQL_FILTER": f"{settings.wfs_date_field} BETWEEN '{start}' AND '{end}'",
+        "count": str(count),
+        "startIndex": str(start_index),
+        "sortBy": settings.wfs_sortby,
+    }
+    url = _wfs_url(params)
+    async with httpx.AsyncClient(timeout=60) as client:
+        r = await client.get(url)
+        r.raise_for_status()
+        return r.json()
 
-# async def iter_wfs(
-#     start: str,
-#     end: str,
-# ) -> AsyncIterator[dict]:
-#     start_index = 0
-#     while True:
-#         data = await fetch_wfs_page(start, end, start_index=start_index)
-#         feats = data.get("features", [])
-#         if not feats:
-#             break
-#         for f in feats:
-#             yield f
-#         start_index += len(feats)
-#         if len(feats) < settings.wfs_page_size:
-#             break
+async def iter_wfs(
+    start: str,
+    end: str,
+) -> AsyncIterator[dict]:
+    start_index = 0
+    while True:
+        data = await fetch_wfs_page(start, end, start_index=start_index)
+        feats = data.get("features", [])
+        if not feats:
+            break
+        for f in feats:
+            yield f
+        start_index += len(feats)
+        if len(feats) < settings.wfs_page_size:
+            break
 
 @retry(
     reraise=True,

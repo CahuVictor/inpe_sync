@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 import uuid
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
-from .routers import ingest, health, debug, schema
+from .routers import ingest, health, debug, schema, data, debug_data
 from .scheduler import start_scheduler, stop_scheduler
 from .logging_config import setup_logging, get_logger
 
@@ -39,6 +39,8 @@ def create_app() -> FastAPI:
     app.include_router(ingest.router)
     app.include_router(schema.router)
     app.include_router(debug.router)
+    app.include_router(data.router)
+    app.include_router(debug_data.router)
     
     @app.on_event("startup")
     async def _startup():
