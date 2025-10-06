@@ -1,34 +1,23 @@
-# app/models.py
-from typing import Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field, conint, confloat
+# app/models/schemas.py
+from __future__ import annotations
+from typing import Optional, Dict, Any, List, Literal, Annotated
+from pydantic import BaseModel, Field, field_validator, ConfigDict, conint, confloat
 
 class HealthResponse(BaseModel):
     ok: bool = True
 
-class IngestResponse(BaseModel):
-    status: str
-    layer: Optional[str] = None
-    total_upserted: Optional[int] = None
-    range: Optional[list[str]] = None
-    last_seen: Optional[str] = None
-
-class WFSSchemaResponse(BaseModel):
-    typeNames: str
-    attr_count: int
-    attributes: List[str]
-    xsd_snippet: str | None = None
-
-class WFSSampleResponse(BaseModel):
-    layer: str
-    received: int
-    preview_ids: List[str]
-
-# --- Saídas ---
+# ---------- Saídas ----------
 class SatelliteCount(BaseModel):
     satelite: Optional[str] = Field(None, description="Nome do satélite")
     count: int = Field(..., ge=0)
 
 class StatsResponse(BaseModel):
+    model_config = {"json_schema_extra": {"example": {
+        "total": 2172,
+        "min_data_hora_gmt": "2025-10-03T00:00:00Z",
+        "max_data_hora_gmt": "2025-10-04T23:59:59Z",
+        "by_satelite": [{"satelite":"AQUA_M-T","count":1234}]
+    }}}
     total: int
     min_data_hora_gmt: Optional[str] = None
     max_data_hora_gmt: Optional[str] = None
@@ -62,9 +51,29 @@ class GeoJSONFeature(BaseModel):
 class GeoJSONFeatureCollection(BaseModel):
     type: Literal["FeatureCollection"] = "FeatureCollection"
     features: List[GeoJSONFeature]
-    
-# --- Entradas (query) ---
 
+class IngestResponse(BaseModel):
+    status: str
+    layer: Optional[str] = None
+    total_upserted: Optional[int] = None
+    range: Optional[list[str]] = None
+    last_seen: Optional[str] = None
+    duration_ms: Optional[int] = None
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "status": "ok",
+                "layer": "dados_abertos:focos_48h_br_satref",
+                "total_upserted": 2172,
+                "range": ["2025-10-01", "2025-10-03"],
+                "last_seen": "2025-10-03T17:09:00Z",
+                "duration_ms": 1234,
+            }
+        }
+    }
+
+# ---------- Entradas (query) ----------
 class QueryParams(BaseModel):
     """Parâmetros de busca textual / temporal / espacial."""
     start: Optional[str] = Field(None, description="Data inicial (YYYY-MM-DD)")
@@ -91,4 +100,33 @@ class QueryParams(BaseModel):
     sort: Literal["-data_hora_gmt", "data_hora_gmt"] = "-data_hora_gmt"
 
     # formato
-    format: Literal["json", "geojson"] = "json"    
+    format: Literal["json", "geojson"] = "json"
+
+    @field_validator("end")
+    @classmethod
+    def _end_after_start(cls, v: Optional[str], info):
+        start = info.data.get("start")
+        if start and v and v < start:
+            raise ValueError("end must be >= start")
+        return v
+
+    @field_validator("bbox")
+    @classmethod
+    def _bbox_fmt(cls, v: Optional[str]):
+        if not v:
+            return v
+        parts = v.split(",")
+        if len(parts) != 4:
+            raise ValueError("bbox must be minLon,minLat,maxLon,maxLat")
+        return v
+
+class WFSSchemaResponse(BaseModel):
+    typeNames: str
+    attr_count: int
+    attributes: List[str]
+    xsd_snippet: str | None = None
+
+# class WFSSampleResponse(BaseModel):
+#     layer: str
+#     received: int
+#     preview_ids: List[str]

@@ -3,7 +3,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from .config import settings
 from .logging_config import get_logger
-from .routers.ingest import run_incremental
+from ..api.v1.routers.ingest import run_incremental
 
 scheduler: AsyncIOScheduler | None = None
 log = get_logger()
